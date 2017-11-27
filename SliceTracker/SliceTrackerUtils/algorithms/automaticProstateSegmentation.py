@@ -24,7 +24,7 @@ class AutomaticSegmentationLogic(ModuleLogicMixin):
   def cleanup(self):
     self.inputVolume = None
 
-  def run(self, inputVolume, domain, colorNode=None):
+  def run(self, inputVolume, domain, interferenceType="Single", colorNode=None):
 
     self.colorNode = colorNode
     if not inputVolume:
@@ -32,7 +32,7 @@ class AutomaticSegmentationLogic(ModuleLogicMixin):
 
     self.inputVolume = inputVolume
     self.invokeEvent(self.DeepLearningStartedEvent)
-    outputLabel = self._runDocker(domain)
+    outputLabel = self._runDocker(properties={"Domain": domain, "InferenceType": interferenceType})
 
     if outputLabel:
       self.invokeEvent(self.DeepLearningFinishedEvent, outputLabel)
@@ -41,7 +41,7 @@ class AutomaticSegmentationLogic(ModuleLogicMixin):
 
     return outputLabel
 
-  def _runDocker(self, domain):
+  def _runDocker(self, properties):
     logic = DeepInfer.DeepInferLogic()
     parameters = DeepInfer.ModelParameters()
     with open(os.path.join(DeepInfer.JSON_LOCAL_DIR, "ProstateSegmenter.json"), "r") as fp:
@@ -62,11 +62,10 @@ class AutomaticSegmentationLogic(ModuleLogicMixin):
     }
 
     params = dict()
-    params['Domain'] = domain
     params['OutputSmoothing'] = 0
     params['ProcessingType'] = 'Fast'
-    params['InferenceType'] = 'Single'
     params['verbose'] = 1
+    params.update(properties)
 
     logic.executeDocker(dockerName, modelName, dataPath, iodict, inputs, params)
 

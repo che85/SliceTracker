@@ -154,7 +154,8 @@ class SessionData(ModuleLogicMixin):
       for attribute, value in jsonResult.iteritems():
         logging.debug("found %s: %s" % (attribute, value))
         if attribute == 'volumes':
-          self._loadResultFileData(value, directory, slicer.util.loadVolume, result.setVolume)
+          self._loadResultFileData(value, directory, slicer.util.loadVolume, result.setVolume,
+                                   properties={'show': False})
         elif attribute == 'transforms':
           self._loadResultFileData(value, directory, slicer.util.loadTransform, result.setTransform)
         elif attribute == 'targets':
@@ -169,7 +170,8 @@ class SessionData(ModuleLogicMixin):
             originalTargets = self._loadOrGetFileData(directory, original, slicer.util.loadMarkupsFiducialList)
             setattr(result.targets, 'original', originalTargets)
         elif attribute == 'labels':
-          self._loadResultFileData(value, directory, slicer.util.loadLabelVolume, result.setLabel)
+          self._loadResultFileData(value, directory, slicer.util.loadVolume, result.setLabel,
+                                   properties={'show': False, 'labelmap': True})
         elif attribute == 'status':
           result.status = value["state"]
           result.timestamp = value["time"]
@@ -180,18 +182,21 @@ class SessionData(ModuleLogicMixin):
           setattr(result, attribute, value)
         self.customProgressBar.text = "Finished loading registration results"
 
-  def _loadResultFileData(self, dictionary, directory, loadFunction, setFunction):
+  def _loadResultFileData(self, dictionary, directory, loadFunction, setFunction, properties=None):
     for regType, filename in dictionary.iteritems():
-      data = self._loadOrGetFileData(directory, filename, loadFunction)
+      data = self._loadOrGetFileData(directory, filename, loadFunction, properties)
       setFunction(regType, data)
 
-  def _loadOrGetFileData(self, directory, filename, loadFunction):
+  def _loadOrGetFileData(self, directory, filename, loadFunction, properties=None):
     if not filename:
       return None
     try:
       data = self.alreadyLoadedFileNames[filename]
     except KeyError:
-      _, data = loadFunction(os.path.join(directory, filename), returnNode=True)
+      if properties:
+        _, data = loadFunction(os.path.join(directory, filename), properties, returnNode=True)
+      else:
+        _, data = loadFunction(os.path.join(directory, filename), returnNode=True)
       self.alreadyLoadedFileNames[filename] = data
     return data
 
