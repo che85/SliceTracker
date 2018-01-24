@@ -1,0 +1,66 @@
+@startuml
+
+class SliceTrackerRegistrationLogic {
+  + IRegistrationAlgorithm algorithm;
+  --
+  + run()
+}
+
+IRegistrationAlgorithm <-- SliceTrackerRegistrationLogic::algorithm: has_a
+
+
+SliceTrackerRegistrationLogic <-- SliceTrackerRegistrationWidget: uses
+SliceTrackerRegistrationLogic <-- CLI: uses
+
+
+interface IRegistrationAlgorithm {
+  + NAME: None
+  + {static} isAlgorithmAvailable()
+  + {abstract} run(parameterNode, registrationResult, progressCallback=None)
+  # _processParameterNode(parameterNode)
+  + updateProgress(**kwargs)
+}
+
+class BRAINRegistration {
+  + NAME="BRAINSFit"
+  + isAlgorithmAvailable()
+  + run(self, parameterNode, result, progressCallback=None)
+  - __runRigidRegistration()
+  - __runAffineRegistration()
+  - __runBSplineRegistration()
+}
+
+class ElastixRegistration {
+  + NAME="Elastix"
+  + isAlgorithmAvailable()
+  + run(self, parameterNode, result, progressCallback=None)
+  - __runRigidBRAINSRegistration()
+  - __runElastixRegistration()
+}
+
+BRAINSRigidRegistration <-- ElastixRegistration::__runRigidBRAINSRegistration: uses
+
+BRAINSRigidRegistration <-- BRAINRegistration::__runRigidRegistration: uses
+BRAINSAffineRegistration <-- BRAINRegistration::__runAffineRegistration: uses
+BRAINSBSplineRegistration <-- BRAINRegistration::__runBSplineRegistration: uses
+
+IRegistrationAlgorithm <|-- BRAINRegistration: is_a
+IRegistrationAlgorithm <|-- ElastixRegistration: is_a
+
+interface IBRAINSRegistrationType{
+  + fixedVolume
+  + movingVolume
+  + fixedLabel
+  + movingLabel
+  + outputTransform
+  + outputVolume
+  + initialTransform=None
+  + {abstract} run()
+  + getGeneralParams()
+}
+
+IBRAINSRegistrationType <|-- BRAINSRigidRegistration : is_a
+IBRAINSRegistrationType <|-- BRAINSAffineRegistration : is_a
+IBRAINSRegistrationType <|-- BRAINSBSplineRegistration : is_a
+
+@enduml
