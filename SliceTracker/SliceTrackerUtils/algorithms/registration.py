@@ -5,14 +5,14 @@ import slicer
 from SlicerDevelopmentToolboxUtils.mixins import ModuleLogicMixin
 
 
-class IRegistrationAlgorithm(ModuleLogicMixin):
+class ImageRegistrationTool(ModuleLogicMixin):
 
   __metaclass__ = ABCMeta
 
   NAME = None
 
   @staticmethod
-  def isAlgorithmAvailable():
+  def isToolAvailable():
     raise NotImplementedError
 
   def __init__(self):
@@ -72,12 +72,12 @@ class IRegistrationAlgorithm(ModuleLogicMixin):
       self.progressCallback(**kwargs)
 
 
-class BRAINSRegistration(IRegistrationAlgorithm):
+class BRAINSRegistration(ImageRegistrationTool):
 
   NAME = "BRAINSFit"
 
   @staticmethod
-  def isAlgorithmAvailable():
+  def isToolAvailable():
     return hasattr(slicer.modules, "brainsfit")
 
   def __init__(self):
@@ -200,12 +200,12 @@ class BRAINSBSplineRegistration(IBRAINSRegistrationType):
     self.params = "BSpline Registration Parameters: %s" % str(params) + "\n\n"
 
 
-class ElastixRegistration(IRegistrationAlgorithm):
+class ElastixRegistration(ImageRegistrationTool):
 
   NAME = "Elastix"
 
   @staticmethod
-  def isAlgorithmAvailable():
+  def isToolAvailable():
     try:
       from Elastix import ElastixLogic
     except ImportError:
@@ -273,5 +273,5 @@ class ElastixRegistration(IRegistrationAlgorithm):
     self.updateProgress(labelText='\nCompleted registration', value=4)
 
 
-__algorithms__ = {'BRAINS':BRAINSRegistration, 'Elastix':ElastixRegistration}
+__tools__ = {'BRAINS':BRAINSRegistration, 'Elastix':ElastixRegistration}
 

@@ -40,7 +40,7 @@ class SliceTrackerRegistrationWidget(ScriptedLoadableModuleWidget, ModuleWidgetM
 
   def __init__(self, parent=None):
     ScriptedLoadableModuleWidget.__init__(self, parent)
-    self.registrationAlgorithm = None
+    self.imageRegistrationTool = None
     self.counter = 1
 
   def setup(self):
@@ -64,8 +64,8 @@ class SliceTrackerRegistrationWidget(ScriptedLoadableModuleWidget, ModuleWidgetM
                                                 showChildNodeTypes=False, selectNodeUponCreation=False,
                                                 toolTip="Select the Targets")
 
-    self.algorithmSelector = qt.QComboBox()
-    self.algorithmSelector.addItems(registration.__algorithms__.keys())
+    self.imageRegistrationToolSelector = qt.QComboBox()
+    self.imageRegistrationToolSelector.addItems(registration.__tools__.keys())
 
     self.applyRegistrationButton = self.createButton("Run Registration")
     self.registrationGroupBoxLayout.addRow("Moving Image Volume: ", self.movingVolumeSelector)
@@ -73,16 +73,16 @@ class SliceTrackerRegistrationWidget(ScriptedLoadableModuleWidget, ModuleWidgetM
     self.registrationGroupBoxLayout.addRow("Fixed Image Volume: ", self.fixedVolumeSelector)
     self.registrationGroupBoxLayout.addRow("Fixed Label Volume: ", self.fixedLabelSelector)
     self.registrationGroupBoxLayout.addRow("Targets: ", self.fiducialSelector)
-    self.registrationGroupBoxLayout.addRow("Algorithm:", self.algorithmSelector)
+    self.registrationGroupBoxLayout.addRow("Image Registration Tool:", self.imageRegistrationToolSelector)
     self.registrationGroupBoxLayout.addRow(self.applyRegistrationButton)
     self.layout.addWidget(self.registrationGroupBox)
     self.layout.addStretch()
     self.setupConnections()
-    self.onAlgorithmSelected(0)
+    self.onImageRegistrationToolSelected(0)
 
   def setupConnections(self):
     self.applyRegistrationButton.clicked.connect(self.runRegistration)
-    self.algorithmSelector.currentIndexChanged.connect(self.onAlgorithmSelected)
+    self.imageRegistrationToolSelector.currentIndexChanged.connect(self.onImageRegistrationToolSelected)
     self.movingVolumeSelector.connect('currentNodeChanged(bool)', self.updateButton)
     self.fixedVolumeSelector.connect('currentNodeChanged(bool)', self.updateButton)
     self.fixedLabelSelector.connect('currentNodeChanged(bool)', self.updateButton)
@@ -102,16 +102,16 @@ class SliceTrackerRegistrationWidget(ScriptedLoadableModuleWidget, ModuleWidgetM
       self.yellowCompositeNode.SetBackgroundVolumeID(self.fixedVolumeSelector.currentNode().GetID())
     if self.fixedLabelSelector.currentNode():
       self.yellowCompositeNode.SetLabelVolumeID(self.fixedLabelSelector.currentNode().GetID())
-    self.applyRegistrationButton.enabled = self.isRegistrationPossible() and self.registrationAlgorithm is not None
+    self.applyRegistrationButton.enabled = self.isRegistrationPossible() and self.imageRegistrationTool is not None
 
-  def onAlgorithmSelected(self, index):
-    text = self.algorithmSelector.itemText(index)
-    algorithm = registration.__algorithms__[text]
-    if algorithm.isAlgorithmAvailable():
-      self.registrationAlgorithm = algorithm
+  def onImageRegistrationToolSelected(self, index):
+    text = self.imageRegistrationToolSelector.itemText(index)
+    imageRegistrationTool = registration.__tools__[text]
+    if imageRegistrationTool.isToolAvailable():
+      self.imageRegistrationTool = imageRegistrationTool
     else:
       logging.info("Selected algorithm {} seems not to be available due to missing dependencies".format(text))
-      self.registrationAlgorithm = None
+      self.imageRegistrationTool = None
     self.updateButton()
 
   def isRegistrationPossible(self):
@@ -122,7 +122,7 @@ class SliceTrackerRegistrationWidget(ScriptedLoadableModuleWidget, ModuleWidgetM
     logging.debug("Starting Registration")
     self.progress = self.createProgressDialog(value=1, maximum=4)
 
-    logic = SliceTrackerRegistrationLogic(self.registrationAlgorithm())
+    logic = SliceTrackerRegistrationLogic(self.imageRegistrationTool())
 
     parameterNode = logic.initializeParameterNode(self.fixedVolumeSelector.currentNode(),
                                                   self.fixedLabelSelector.currentNode(),
@@ -158,13 +158,13 @@ class SliceTrackerRegistrationLogic(ScriptedLoadableModuleLogic):
 
   def __init__(self, algorithm):
     ScriptedLoadableModuleLogic.__init__(self)
-    self.registrationAlgorithm = algorithm
+    self.imageRegistrationTool = algorithm
 
   def run(self, parameterNode, result, progressCallback=None):
-    self.registrationAlgorithm.run(parameterNode, result, progressCallback)
+    self.imageRegistrationTool.run(parameterNode, result, progressCallback)
 
   def getResult(self):
-    return self.registrationAlgorithm.registrationResult
+    return self.imageRegistrationTool.registrationResult
 
 
 def main(argv):
@@ -183,7 +183,7 @@ def main(argv):
     parser.add_argument("-o", "--output-directory", dest="output_directory", metavar="PATH", default="-",
                         required=False, help="Output directory for registration result")
     parser.add_argument("-al", "--algorithm", dest="algorithm", metavar="PATH", default="BRAINS",
-                        choices=registration.__algorithms__.keys(), required=False,
+                        choices=registration.__tools__.keys(), required=False,
                         help="Algorithm to be used for registration (default: %(default)s)")
 
     args = parser.parse_args(argv)
@@ -197,12 +197,12 @@ def main(argv):
     success, fixedVolume = slicer.util.loadVolume(args.fixed_volume, returnNode=True)
     success, movingVolume = slicer.util.loadVolume(args.moving_volume, returnNode=True)
 
-    algorithm = registration.__algorithms__[args.algorithm]
+    imageRegistrationTool = registration.__tools__[args.algorithm]
 
-    if not algorithm.isAlgorithmAvailable():
+    if not imageRegistrationTool.isToolAvailable():
       raise RuntimeError("Registration algorithm {} cannot be executed due to missing dependencies.".format(args.algorithm))
 
-    logic = SliceTrackerRegistrationLogic(algorithm())
+    logic = SliceTrackerRegistrationLogic(imageRegistrationTool())
     parameterNode = logic.initializeParameterNode(fixedVolume, fixedLabel, movingVolume, movingLabel)
     logic.run(parameterNode, result=RegistrationResult("01: RegistrationResult"))
 

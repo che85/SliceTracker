@@ -724,15 +724,16 @@ class SliceTrackerSession(StepBasedSession):
     self.invokeEvent(self.InitiateEvaluationEvent)
 
   def getRegistrationLogic(self):
-    preferred = self.getSetting("Prostate_Registration_Algorithm")
+    preferred = self.getSetting("Prostate_Registration_Tool")
     fallback = self.getSetting("Prostate_Registration_Fallback")
-    registrationClass = getattr(sys.modules[__name__], preferred)
-    if not registrationClass.isAlgorithmAvailable():
-      registrationClass = getattr(sys.modules[__name__], fallback)
-      if not registrationClass.isAlgorithmAvailable():
+    registrationToolClass = getattr(sys.modules[__name__], preferred)
+    if not registrationToolClass.isToolAvailable():
+      registrationToolClass = getattr(sys.modules[__name__], fallback)
+      if not registrationToolClass.isToolAvailable():
         raise RuntimeError("Neither preferred registration algorithm: {}, nor fallback registration algorithm {}"
                            "are available. Make sure to install required dependencies".format(preferred, fallback))
-    return SliceTrackerRegistrationLogic(registrationClass())
+      logging.info("Preferred registration algorithm: {} not available. Falling back to {}. ".format(preferred, fallback))
+    return SliceTrackerRegistrationLogic(registrationToolClass())
 
   def addTargetsToMRMLScene(self, result):
     targetNodes = result.targets.asDict()
