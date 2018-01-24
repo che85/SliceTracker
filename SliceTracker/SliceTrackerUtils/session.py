@@ -1,4 +1,5 @@
 import os, logging
+import sys
 import vtk, ctk, ast
 import qt
 import xml
@@ -26,6 +27,7 @@ from SlicerDevelopmentToolboxUtils.module.session import StepBasedSession
 
 from SliceTrackerRegistration import SliceTrackerRegistrationLogic
 from steps.plugins.segmentationValidator import SliceTrackerSegmentationValidatorPlugin
+from .algorithms.registration import *
 
 
 @singleton
@@ -198,7 +200,6 @@ class SliceTrackerSession(StepBasedSession):
 
   def __init__(self):
     StepBasedSession.__init__(self)
-    self.registrationLogic = SliceTrackerRegistrationLogic()
     self.seriesTypeManager = SeriesTypeManager()
     self.seriesTypeManager.addEventObserver(self.seriesTypeManager.SeriesTypeManuallyAssignedEvent,
                                             lambda caller, event: self.invokeEvent(self.SeriesTypeManuallyAssignedEvent))
@@ -673,7 +674,6 @@ class SliceTrackerSession(StepBasedSession):
     name, suffix = self.getRegistrationResultNameAndGeneratedSuffix(fixedVolume.GetName())
     result = self.data.createResult(name + suffix)
     result.suffix = suffix
-    self.registrationLogic.registrationResult = result
     return result
 
   def applyInitialRegistration(self, retryMode, segmentationData, progressCallback=None):
@@ -682,8 +682,10 @@ class SliceTrackerSession(StepBasedSession):
 
     self.runBRAINSResample(inputVolume=self.fixedLabel, referenceVolume=self.fixedVolume,
                            outputVolume=self.fixedLabel)
-    self._runRegistration(self.fixedVolume, self.fixedLabel, self.movingVolume,
-                          self.movingLabel, self.movingTargets, segmentationData, progressCallback)
+    parameterNode = SliceTrackerRegistrationLogic.initializeParameterNode(self.fixedVolume, self.fixedLabel,
+                                                                          self.movingVolume, self.movingLabel,
+                                                                          self.movingTargets)
+    self._runRegistration(parameterNode, segmentationData, progressCallback)
 
   def applyRegistration(self, progressCallback=None):
 
@@ -692,7 +694,6 @@ class SliceTrackerSession(StepBasedSession):
     lastApprovedTfm = self.data.getMostRecentApprovedTransform()
     initialTransform = lastApprovedTfm if lastApprovedTfm else lastRigidTfm
 
-
     fixedLabel = self.volumesLogic.CreateAndAddLabelVolume(slicer.mrmlScene, self.currentSeriesVolume,
                                                            self.currentSeriesVolume.GetName() + '-label')
 
@@ -700,29 +701,38 @@ class SliceTrackerSession(StepBasedSession):
                            outputVolume=fixedLabel, warpTransform=initialTransform)
 
     self.dilateMask(fixedLabel, dilateValue=self.segmentedLabelValue)
-    self._runRegistration(self.currentSeriesVolume, fixedLabel, coverProstateRegResult.volumes.fixed,
-                          coverProstateRegResult.labels.fixed, coverProstateRegResult.targets.approved, None,
-                          progressCallback)
+    parameterNode = SliceTrackerRegistrationLogic.initializeParameterNode(self.currentSeriesVolume, fixedLabel,
+                                                                          coverProstateRegResult.volumes.fixed,
+                                                                          coverProstateRegResult.labels.fixed,
+                                                                          coverProstateRegResult.targets.approved)
+    self._runRegistration(parameterNode, None, progressCallback)
 
-  def _runRegistration(self, fixedVolume, fixedLabel, movingVolume, movingLabel, targets, segmentationData,
-                       progressCallback):
+  def _runRegistration(self, parameterNode, segmentationData, progressCallback):
+    fixedVolume = slicer.mrmlScene.GetNodeByID(parameterNode.GetAttribute('FixedImageNodeID'))
     result = self.generateNameAndCreateRegistrationResult(fixedVolume)
     result.receivedTime = self.seriesTimeStamps[result.name.replace(result.suffix, "")]
     if segmentationData:
       result.segmentationData = segmentationData
-    parameterNode = slicer.vtkMRMLScriptedModuleNode()
-    parameterNode.SetAttribute('FixedImageNodeID', fixedVolume.GetID())
-    parameterNode.SetAttribute('FixedLabelNodeID', fixedLabel.GetID())
-    parameterNode.SetAttribute('MovingImageNodeID', movingVolume.GetID())
-    parameterNode.SetAttribute('MovingLabelNodeID', movingLabel.GetID())
-    parameterNode.SetAttribute('TargetsNodeID', targets.GetID())
     result.startTime = self.getTime()
-    self.registrationLogic.run(parameterNode, progressCallback=progressCallback)
+    registrationLogic = self.getRegistrationLogic()
+    registrationLogic.run(parameterNode, result, progressCallback=progressCallback)
     result.endTime = self.getTime()
+
     self.addTargetsToMRMLScene(result)
     if self.seriesTypeManager.isCoverProstate(self.currentSeries) and self.temporaryIntraopTargets:
       self.addTemporaryTargetsToResult(result)
     self.invokeEvent(self.InitiateEvaluationEvent)
+
+  def getRegistrationLogic(self):
+    preferred = self.getSetting("Prostate_Registration_Algorithm")
+    fallback = self.getSetting("Prostate_Registration_Fallback")
+    registrationClass = getattr(sys.modules[__name__], preferred)
+    if not registrationClass.isAlgorithmAvailable():
+      registrationClass = getattr(sys.modules[__name__], fallback)
+      if not registrationClass.isAlgorithmAvailable():
+        raise RuntimeError("Neither preferred registration algorithm: {}, nor fallback registration algorithm {}"
+                           "are available. Make sure to install required dependencies".format(preferred, fallback))
+    return SliceTrackerRegistrationLogic(registrationClass())
 
   def addTargetsToMRMLScene(self, result):
     targetNodes = result.targets.asDict()
