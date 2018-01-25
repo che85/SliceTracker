@@ -212,6 +212,12 @@ class ElastixRegistration(ImageRegistrationTool):
       return False
     return True
 
+  def __init__(self):
+    super(ElastixRegistration, self).__init__()
+    import os, sys
+    self.parametersDirectory = os.path.join(os.path.dirname(sys.modules[self.__module__].__file__), '..', '..',
+                                            'Resources', 'ElastixRegistrationParameters')
+
   def hardenTransform(self, nodes, transform):
     tfmLogic = slicer.modules.transforms.logic()
     for node in nodes:
@@ -236,7 +242,7 @@ class ElastixRegistration(ImageRegistrationTool):
                          transform=self.registrationResult.transforms.rigid)
 
     self.registrationResult.transforms.rigid.Inverse()
-    self.hardenTransform(nodes=[self.registrationResult.volumes.moving, self.registrationResult.labels.moving],
+    self.hardenTransform(nodes=[self.registrationResult.labels.moving],
                          transform=self.registrationResult.transforms.rigid)
     self.registrationResult.transforms.rigid.Inverse()
 
@@ -262,10 +268,11 @@ class ElastixRegistration(ImageRegistrationTool):
 
   def __runElastixRegistration(self):
     self.updateProgress(labelText='\nElastix registration', value=3)
-    from Elastix import ElastixLogic, RegistrationPresets_ParameterFilenames
+    from Elastix import ElastixLogic
+    import os
     logic = ElastixLogic()
-    parameterFileNames = logic.getRegistrationPresets()[0][RegistrationPresets_ParameterFilenames]
-    print RegistrationPresets_ParameterFilenames
+    pFileNames = ["Parameters_BSpline.txt"] # "Parameters_Rigid.txt",  "Parameters_Affine.txt"
+    parameterFileNames = [os.path.join(self.parametersDirectory, pFile) for pFile in pFileNames]
     logic.registerVolumes(self.registrationResult.volumes.fixed, self.registrationResult.volumes.moving,
                           parameterFileNames, self.registrationResult.volumes.bSpline,
                           self.registrationResult.transforms.bSpline,

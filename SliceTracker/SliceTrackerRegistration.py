@@ -182,9 +182,9 @@ def main(argv):
                         required=False, help="Initial rigid transform for re-registration")
     parser.add_argument("-o", "--output-directory", dest="output_directory", metavar="PATH", default="-",
                         required=False, help="Output directory for registration result")
-    parser.add_argument("-al", "--algorithm", dest="algorithm", metavar="PATH", default="BRAINS",
+    parser.add_argument("-t", "--tool", dest="tool", metavar="PATH", default="BRAINS",
                         choices=registration.__tools__.keys(), required=False,
-                        help="Algorithm to be used for registration (default: %(default)s)")
+                        help="Image Registration Tool to be used for registration (default: %(default)s)")
 
     args = parser.parse_args(argv)
 
@@ -197,10 +197,10 @@ def main(argv):
     success, fixedVolume = slicer.util.loadVolume(args.fixed_volume, returnNode=True)
     success, movingVolume = slicer.util.loadVolume(args.moving_volume, returnNode=True)
 
-    imageRegistrationTool = registration.__tools__[args.algorithm]
+    imageRegistrationTool = registration.__tools__[args.tool]
 
     if not imageRegistrationTool.isToolAvailable():
-      raise RuntimeError("Registration algorithm {} cannot be executed due to missing dependencies.".format(args.algorithm))
+      raise RuntimeError("Image Registration Tool {} cannot be executed due to missing dependencies.".format(args.tool))
 
     logic = SliceTrackerRegistrationLogic(imageRegistrationTool())
     parameterNode = logic.initializeParameterNode(fixedVolume, fixedLabel, movingVolume, movingLabel)
