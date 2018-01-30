@@ -109,7 +109,7 @@ class BRAINSRegistration(ImageRegistrationTool):
                                   self.registrationResult.labels.fixed, self.registrationResult.labels.moving,
                                   self.registrationResult.transforms.rigid, self.registrationResult.volumes.rigid)
     reg.run()
-    self.registrationResult.cmdArguments += reg.params
+    self.registrationResult.cmdArguments += reg.paramsInfo
 
   def __runAffineRegistration(self):
     self.updateProgress(labelText='\nAffine registration', value=2)
@@ -118,7 +118,7 @@ class BRAINSRegistration(ImageRegistrationTool):
                                    self.registrationResult.transforms.affine, self.registrationResult.volumes.affine,
                                    self.registrationResult.transforms.rigid)
     reg.run()
-    self.registrationResult.cmdArguments += reg.params
+    self.registrationResult.cmdArguments += reg.paramsInfo
 
   def __runBSplineRegistration(self):
     self.updateProgress(labelText='\nBSpline registration', value=3)
@@ -128,7 +128,7 @@ class BRAINSRegistration(ImageRegistrationTool):
                                     self.registrationResult.transforms.bSpline, self.registrationResult.volumes.bSpline,
                                     self.registrationResult.transforms.affine)
     reg.run()
-    self.registrationResult.cmdArguments += reg.params
+    self.registrationResult.cmdArguments += reg.paramsInfo
 
     self.updateProgress(labelText='\nCompleted registration', value=4)
 
@@ -137,67 +137,64 @@ class IBRAINSRegistrationType(object):
 
   __metaclass__ = ABCMeta
 
-  def __init__(self, fixedVolume, movingVolume, fixedLabel, movingLabel, outputTransform, outputVolume,
+  def __init__(self, fixedVolume, movingVolume, fixedLabel, movingLabel, outputTransform, outputVolume=None,
                initialTransform=None):
-    self.fixedVolume = fixedVolume
-    self.movingVolume = movingVolume
-    self.fixedLabel = fixedLabel
-    self.movingLabel = movingLabel
-    self.outputTransform = outputTransform
-    self.outputVolume = outputVolume
-    self.initialTransform = initialTransform
-    self.params = None
+    self.params = dict(fixedVolume=fixedVolume,
+                       movingVolume=movingVolume,
+                       fixedBinaryVolume=fixedLabel,
+                       movingBinaryVolume=movingLabel,
+                       outputTransform=outputTransform.GetID())
+    if outputVolume:
+      self.params['outputVolume'] = outputVolume.GetID()
+    if initialTransform:
+      self.params['initialTransform'] = initialTransform
 
   @abstractmethod
   def run(self):
     pass
 
-  def getGeneralParams(self):
-    return {'fixedVolume': self.fixedVolume,
-            'movingVolume': self.movingVolume,
-            'fixedBinaryVolume': self.fixedLabel,
-            'movingBinaryVolume': self.movingLabel,
-            'outputTransform': self.outputTransform.GetID(),
-            'outputVolume': self.outputVolume.GetID()}
-
 
 class BRAINSRigidRegistration(IBRAINSRegistrationType):
 
   def run(self):
-    params = {'maskProcessingMode': "ROI",
-              'initializeTransformMode': "useCenterOfROIAlign",
-              'useRigid': True}
-    params.update(self.getGeneralParams())
-    slicer.cli.run(slicer.modules.brainsfit, None, params, wait_for_completion=True)
-    self.params = "Rigid Registration Parameters: %s" % str(params) + "\n\n"
+    self.params.update({'maskProcessingMode': "ROI",
+                        'initializeTransformMode': "useCenterOfROIAlign",
+                        'useRigid': True})
+    slicer.cli.run(slicer.modules.brainsfit, None, self.params, wait_for_completion=True)
+    self.paramsInfo = "Rigid Registration Parameters: %s" % str(self.params) + "\n\n"
+
+
+class BRAINSROIInitializer(IBRAINSRegistrationType):
+
+  def run(self):
+    self.params.update({'maskProcessingMode': "ROI",
+                        'initializeTransformMode': "useCenterOfROIAlign"})
+    slicer.cli.run(slicer.modules.brainsfit, None, self.params, wait_for_completion=True)
+    self.paramsInfo = "ROI Initializer Parameters: %s" % str(self.params) + "\n\n"
 
 
 class BRAINSAffineRegistration(IBRAINSRegistrationType):
 
   def run(self):
-    params = {'maskProcessingMode': "ROI",
-              'useAffine': True,
-              'initialTransform': self.initialTransform}
-    params.update(self.getGeneralParams())
-    slicer.cli.run(slicer.modules.brainsfit, None, params, wait_for_completion=True)
-    self.params = "Affine Registration Parameters: %s" % str(params) + "\n\n"
+    self.params.update({'maskProcessingMode': "ROI",
+                        'useAffine': True})
+    slicer.cli.run(slicer.modules.brainsfit, None, self.params, wait_for_completion=True)
+    self.paramsInfo = "Affine Registration Parameters: %s" % str(self.params) + "\n\n"
 
 
 class BRAINSBSplineRegistration(IBRAINSRegistrationType):
 
   def run(self):
-    params = {'useROIBSpline': True,
-              'useBSpline': True,
-              'splineGridSize': "3,3,3",
-              'maskProcessing': "ROI",
-              'minimumStepLength': "0.005",
-              'maximumStepLength': "0.2",
-              'costFunctionConvergenceFactor': "1.00E+09",
-              'maskProcessingMode': "ROI",
-              'initialTransform': self.initialTransform}
-    params.update(self.getGeneralParams())
-    slicer.cli.run(slicer.modules.brainsfit, None, params, wait_for_completion=True)
-    self.params = "BSpline Registration Parameters: %s" % str(params) + "\n\n"
+    self.params.update({'useROIBSpline': True,
+                        'useBSpline': True,
+                        'splineGridSize': "3,3,3",
+                        'maskProcessing': "ROI",
+                        'minimumStepLength': "0.005",
+                        'maximumStepLength': "0.2",
+                        'costFunctionConvergenceFactor': "1.00E+09",
+                        'maskProcessingMode': "ROI"})
+    slicer.cli.run(slicer.modules.brainsfit, None, self.params, wait_for_completion=True)
+    self.paramsInfo = "BSpline Registration Parameters: %s" % str(self.params) + "\n\n"
 
 
 class ElastixRegistration(ImageRegistrationTool):
@@ -229,49 +226,52 @@ class ElastixRegistration(ImageRegistrationTool):
     self.registrationResult = result
     self._processParameterNode(parameterNode)
 
-    registrationTypes = ['rigid', 'bSpline']
+    registrationTypes = ['bSpline']
     self.createVolumeAndTransformNodes(registrationTypes, prefix=str(result.seriesNumber), suffix=result.suffix,
                                        deformableRegistrationNodeClass=slicer.vtkMRMLTransformNode)
 
-    self.__runRigidBRAINSRegistration()
+    initTransform = self.__runBRAINSROIInitializer()
     self.hardenTransform(nodes=[self.registrationResult.volumes.moving, self.registrationResult.labels.moving],
-                         transform=self.registrationResult.transforms.rigid)
+                         transform=initTransform)
     self.__runElastixRegistration()
 
-    self.hardenTransform(nodes=[self.registrationResult.transforms.bSpline],
-                         transform=self.registrationResult.transforms.rigid)
+    initTransform.Inverse()
+    self.hardenTransform(nodes=[self.registrationResult.labels.moving], transform=initTransform)
+    initTransform.Inverse()
+    self.hardenTransform(nodes=[initTransform], transform=self.registrationResult.transforms.bSpline)
 
-    self.registrationResult.transforms.rigid.Inverse()
-    self.hardenTransform(nodes=[self.registrationResult.labels.moving],
-                         transform=self.registrationResult.transforms.rigid)
-    self.registrationResult.transforms.rigid.Inverse()
+    initTransform.SetName(self.registrationResult.transforms.bSpline.GetName())
+    slicer.mrmlScene.RemoveNode(self.registrationResult.transforms.bSpline)
+    self.registrationResult.transforms.bSpline = initTransform
 
     targetsNodeID = parameterNode.GetAttribute('TargetsNodeID')
     if targetsNodeID:
       result.targets.original = slicer.mrmlScene.GetNodeByID(targetsNodeID)
       self.transformTargets(registrationTypes, result.targets.original, str(result.seriesNumber), suffix=result.suffix)
+
     slicer.mrmlScene.RemoveNode(result.volumes.moving)
     result.volumes.moving = slicer.mrmlScene.GetNodeByID(parameterNode.GetAttribute('MovingImageNodeID'))
 
-  def __runRigidBRAINSRegistration(self):
-    self.updateProgress(labelText='\nRigid registration', value=2)
+  def __runBRAINSROIInitializer(self):
+    self.updateProgress(labelText='\nROI initialization', value=2)
 
-    rigidRegistration = BRAINSRigidRegistration(self.registrationResult.volumes.fixed,
-                                                self.registrationResult.volumes.moving,
-                                                self.registrationResult.labels.fixed,
-                                                self.registrationResult.labels.moving,
-                                                self.registrationResult.transforms.rigid,
-                                                self.registrationResult.volumes.rigid)
+    transform = self.createLinearTransformNode(self.registrationResult.volumes.moving.GetName()+"_temp_transform")
+    slicer.mrmlScene.AddNode(transform)
+    rigidRegistration = BRAINSROIInitializer(self.registrationResult.volumes.fixed,
+                                             self.registrationResult.volumes.moving,
+                                             self.registrationResult.labels.fixed,
+                                             self.registrationResult.labels.moving,
+                                             outputTransform=transform)
     rigidRegistration.run()
-
-    self.registrationResult.cmdArguments += rigidRegistration.params
+    self.registrationResult.cmdArguments += rigidRegistration.paramsInfo
+    return transform
 
   def __runElastixRegistration(self):
     self.updateProgress(labelText='\nElastix registration', value=3)
     from Elastix import ElastixLogic
     import os
     logic = ElastixLogic()
-    pFileNames = ["Parameters_BSpline.txt"] # "Parameters_Rigid.txt",  "Parameters_Affine.txt"
+    pFileNames = ["Parameters_Rigid.txt", "Parameters_BSpline.txt"]
     parameterFileNames = [os.path.join(self.parametersDirectory, pFile) for pFile in pFileNames]
     logic.registerVolumes(self.registrationResult.volumes.fixed, self.registrationResult.volumes.moving,
                           parameterFileNames, self.registrationResult.volumes.bSpline,

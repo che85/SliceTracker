@@ -11,20 +11,6 @@
 (FixedInternalImagePixelType "float")
 (MovingInternalImagePixelType "float")
 
-// The dimensions of the fixed and moving image
-// NB: This has to be specified by the user. The dimension of
-// the images is currently NOT read from the images.
-// Also note that some other settings may have to specified
-// for each dimension separately.
-(MovingImageDimension 3)
-
-// Specify whether you want to take into account the so-called
-// direction cosines of the images. Recommended: true.
-// In some cases, the direction cosines of the image are corrupt,
-// due to image format conversions for example. In that case, you 
-// may want to set this option to "false".
-(UseDirectionCosines "true")
-
 // **************** Main Components **************************
 
 // The following components should usually be left as they are:
@@ -55,7 +41,7 @@
 
 // Automatically guess an initial translation by aligning the
 // geometric centers of the fixed and moving.
-(AutomaticTransformInitialization "true")
+(AutomaticTransformInitialization "false")
 
 // Whether transforms are combined by composition or by addition.
 // In generally, Compose is the best option in most cases.
@@ -81,7 +67,7 @@
 // The number of resolutions. 1 Is only enough if the expected
 // deformations are small. 3 or 4 mostly works fine. For large
 // images and large deformations, 5 or 6 may even be useful.
-(NumberOfResolutions 4)
+(NumberOfResolutions 2)
 
 // The downsampling/blurring factors for the image pyramids.
 // By default, the images are downsampled by a factor of 2

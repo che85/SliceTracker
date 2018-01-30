@@ -690,9 +690,8 @@ class SliceTrackerSession(StepBasedSession):
   def applyRegistration(self, progressCallback=None):
 
     coverProstateRegResult = self.data.getMostRecentApprovedCoverProstateRegistration()
-    lastRigidTfm = self.data.getLastApprovedRigidTransformation()
     lastApprovedTfm = self.data.getMostRecentApprovedTransform()
-    initialTransform = lastApprovedTfm if lastApprovedTfm else lastRigidTfm
+    initialTransform = lastApprovedTfm if lastApprovedTfm else self.data.getLastApprovedRigidTransformation()
 
     fixedLabel = self.volumesLogic.CreateAndAddLabelVolume(slicer.mrmlScene, self.currentSeriesVolume,
                                                            self.currentSeriesVolume.GetName() + '-label')
